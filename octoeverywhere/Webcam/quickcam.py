@@ -629,7 +629,8 @@ class QuickCam_RTSP:
         self.Process:subprocess.Popen = None #pyright: ignore[reportAttributeAccessIssue]
 
         # Image getting stuff
-        self.Buffer:Optional[bytes] = None
+        #self.Buffer:Optional[bytes] = None
+        self.Buffer = bytearray()
         self.SearchedIndex = 0
         self.JpegStartSequence = bytearray([0xff, 0xd8, 0xff, 0xfe, 0x00, 0x10])
         self.JpegStartSequenceLen = len(self.JpegStartSequence)
@@ -670,17 +671,24 @@ class QuickCam_RTSP:
         #   We use the default jpeg image quality, for the same FPS reasons above.
         # pylint: disable=consider-using-with # We handle this on our own.
         self.Process = subprocess.Popen(["ffmpeg",
-                    "-hide_banner",
-                    "-y",
-                    "-loglevel", logLevel,
-                    "-rtsp_transport", rtspTransport,
-                    "-use_wallclock_as_timestamps", "1",
-                    "-i", url,
-                    "-filter:v", f"fps={fps}",
-                    "-movflags", "+faststart",
-                    "-f", "image2pipe", "-"
-                    ],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            "-hide_banner",
+            "-y",
+            "-loglevel", logLevel,
+            # hw flags
+            "-hwaccel", "vaapi",
+            "-hwaccel_device", "/dev/dri/renderD128",
+            "-hwaccel_output_format", "vaapi",
+
+            "-rtsp_transport", rtspTransport,
+            "-use_wallclock_as_timestamps", "1",
+            "-i", url,
+            # We must use a VA-API filter for the FPS drop to keep it on the GPU
+            "-vf", f"fps={fps},format=nv12,hwdownload,format=yuv420p",
+            "-movflags", "+faststart",
+            "-f", "image2pipe", "-"
+            ],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
         # pylint: disable=no-member # Linux only
         stdout = self.Process.stdout #pyright: ignore[reportUnknownMemberType]
         if stdout is None:
@@ -743,9 +751,9 @@ class QuickCam_RTSP:
 
             # Append this buffer to the current pending buffer.
             if self.Buffer is None:
-                self.Buffer = buffer
+                self.Buffer = bytearray(buffer)
             else:
-                self.Buffer += buffer
+                self.Buffer.extend(buffer)
 
             # Ensure the buffer is long enough to check.
             buffLen = len(self.Buffer)
@@ -797,11 +805,11 @@ class QuickCam_RTSP:
 
 
     def _ResetLocalBufferIfOverLimit(self) -> None:
-        # A normal image is around 37,000, so if the buffer is too long, reset it so
-        # we can try to recover the buffer.
-        if self.Buffer is not None and len(self.Buffer) > 50000:
-            self.Logger.info("Quick cam rtsp buffer reset. This means we are running behind.")
-            self._ResetLocalBuffer()
+        if self.Buffer is not None:
+            bufferLen = len(self.Buffer)
+            if bufferLen > 50_000_000:
+                self.Logger.info(f"Quick cam rtsp buffer reset ({bufferLen / (1024*1024):.2f} > 50MB). This means we are running behind.")
+                self._ResetLocalBuffer()
 
 
     def _ResetLocalBuffer(self, hasNewImage:bool = False) -> None:
