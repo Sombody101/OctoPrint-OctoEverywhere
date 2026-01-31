@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: sombody101/oe-video-proxy
+  IMAGE_NAME: sombody101/octoeverywhere
 
 jobs:
   build-and-push:
