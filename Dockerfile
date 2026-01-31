@@ -20,7 +20,11 @@ ENV DATA_DIR=/data/
 # Install the required packages.
 # Any packages here should be mirrored in the install script - and any optional pillow packages done inline.
 # GCC, python3-dev, and musl-dev are required for pillow, and jpeg-dev and zlib-dev are required for jpeg support.
-RUN apk add --no-cache curl ffmpeg jq python3 python3-dev gcc musl-dev py3-pip py3-virtualenv jpeg-dev libjpeg-turbo-dev zlib-dev py3-pillow libffi-dev
+RUN apk add --no-cache curl ffmpeg jq python3 python3-dev gcc musl-dev py3-pip py3-virtualenv jpeg-dev libjpeg-turbo-dev zlib-dev py3-pillow libffi-dev \
+    libva-intel-driver \
+    intel-media-driver \
+    libva-utils \
+    mesa-va-gallium
 
 # Timezone setup steps
 # These steps are necessary to add timezone support to the container and allow for setting the timezone
