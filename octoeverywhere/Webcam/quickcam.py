@@ -658,7 +658,7 @@ class QuickCam_RTSP:
         # But for other RTSP streams like Wzye bridge cams, it's more intensive and we need to drop to 10 fps.
         # If we don't drop the FPS, the stream will fall behind.
         fps = 10
-        if url.find("bblp:") != -1:
+        if url.find("bblp:") != -1 or url.find("rtsp:") != -1:
             fps = 15
 
         # For auth, if there's a username and password it will already be in the URL in the http:// basic auth style,
@@ -670,22 +670,21 @@ class QuickCam_RTSP:
         # Notes
         #   We use the default jpeg image quality, for the same FPS reasons above.
         # pylint: disable=consider-using-with # We handle this on our own.
-        self.Process = subprocess.Popen(["ffmpeg",
+        self.Process = subprocess.Popen([
+            "ffmpeg",
             "-hide_banner",
-            "-y",
-            "-loglevel", logLevel,
-            # hw flags
+            "-loglevel", "error",
             "-hwaccel", "vaapi",
             "-hwaccel_device", "/dev/dri/renderD128",
             "-hwaccel_output_format", "vaapi",
-
             "-rtsp_transport", rtspTransport,
-            "-use_wallclock_as_timestamps", "1",
             "-i", url,
-            # We must use a VA-API filter for the FPS drop to keep it on the GPU
-            "-vf", f"fps={fps},format=nv12,hwdownload,format=yuv420p",
-            "-movflags", "+faststart",
-            "-f", "image2pipe", "-"
+            "-vf", f"fps={fps},hwdownload,format=nv12",
+            "-f", "image2pipe",
+            "-vcodec", "mjpeg",
+            "-huffman", "optimal",
+            "-q:v", "5",
+            "-"
             ],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
